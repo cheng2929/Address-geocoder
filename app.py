@@ -6,6 +6,11 @@ from PIL import Image
 import time
 import requests
 import json
+import urllib3 # 新增：用來處理 SSL 警告
+
+# --- 設定：關閉 SSL 不安全警告 ---
+# 因為 TGOS 的憑證可能會被 Python 擋下，我們需要強制忽略驗證，並關閉警告訊息
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # --- 設定與常數 ---
 # Google 精度類型翻譯
@@ -57,7 +62,7 @@ with st.sidebar.expander("TGOS (內政部) 設定", expanded=True):
     tgos_apikey = st.text_input("TGOS APIKey", type="password", help="請輸入您的 TGOS APIKey")
 
 # ==========================================
-# 核心功能函式庫 (保持不變)
+# 核心功能函式庫
 # ==========================================
 def use_google_engine(addr, api_key):
     """使用 Google API 查詢"""
@@ -77,17 +82,38 @@ def use_google_engine(addr, api_key):
     except Exception as e: return None, f"Google API 錯誤: {e}"
 
 def use_tgos_engine(addr, appid, apikey):
-    """使用 TGOS API 查詢"""
+    """使用 TGOS API 查詢 (已修正 SSL 問題)"""
     if not appid or not apikey: return None, "未設定 TGOS APPID 或 APIKey"
+    
     tgos_url = "https://gis.tgos.tw/TGOS_MAP_API/Web/Address/TGOS_Address.aspx"
-    params = {'oAPPId': appid, 'oAPIKey': apikey, 'Address': addr, 'SRS': 'EPSG:3826', 'FuzzyType': '2', 'ResultDataType': 'JSON', 'FuzzyNumber': '1', 'IsOnlyFullMatch': 'false', 'Columnname': 'Geometry'}
+    
+    params = {
+        'oAPPId': appid, 
+        'oAPIKey': apikey, 
+        'Address': addr, 
+        'SRS': 'EPSG:3826', 
+        'FuzzyType': '2', 
+        'ResultDataType': 'JSON', 
+        'FuzzyNumber': '1', 
+        'IsOnlyFullMatch': 'false', 
+        'Columnname': 'Geometry'
+    }
+    
     try:
         headers = {'User-Agent': 'Mozilla/5.0'}
-        response = requests.get(tgos_url, params=params, headers=headers, timeout=10)
+        # 關鍵修正：加入 verify=False 以忽略 SSL 憑證錯誤
+        response = requests.get(tgos_url, params=params, headers=headers, timeout=10, verify=False)
+        
         if response.status_code == 200:
             clean_text = response.text.strip()
             if clean_text.startswith(u'\ufeff'): clean_text = clean_text[1:]
-            data = json.loads(clean_text)
+            
+            try:
+                data = json.loads(clean_text)
+            except json.JSONDecodeError:
+                # TGOS 有時候會回傳 XML 或錯誤字串，而非 JSON
+                return None, f"TGOS 回傳格式無法解析: {clean_text[:50]}..."
+
             if 'AddressList' in data and len(data['AddressList']) > 0:
                 top_result = data['AddressList'][0]
                 twd97_x = float(top_result['X'])
@@ -96,10 +122,15 @@ def use_tgos_engine(addr, appid, apikey):
                 match_type_zh = TGOS_TYPE_MAPPING.get(match_type_raw, f"TGOS: {match_type_raw}")
                 lng, lat = trans_to_wgs84.transform(twd97_x, twd97_y)
                 return {"source": "TGOS", "lat": lat, "lng": lng, "twd97_x": twd97_x, "twd97_y": twd97_y, "accuracy_zh": match_type_zh}, None
-            elif 'Info' in data: return None, f"TGOS 回應: {data['Info'][0]}"
-            else: return None, "TGOS 查無結果"
-        else: return None, f"TGOS HTTP 錯誤: {response.status_code}"
-    except Exception as e: return None, f"TGOS 連線/解析錯誤: {e}"
+            elif 'Info' in data: 
+                return None, f"TGOS 回應: {data['Info'][0]}"
+            else: 
+                return None, "TGOS 查無結果"
+        else: 
+            return None, f"TGOS HTTP 錯誤: {response.status_code}"
+            
+    except Exception as e: 
+        return None, f"TGOS 連線錯誤 (請檢查 Key 或 IP): {e}"
 
 # ==========================================
 # 介面分頁
@@ -107,7 +138,7 @@ def use_tgos_engine(addr, appid, apikey):
 tab1, tab2 = st.tabs(["🔍 單筆轉換", "📂 批次轉換 (雙引擎)"])
 
 # ==========================================
-# 分頁 1: 單筆手動轉換 (功能保持不變)
+# 分頁 1: 單筆手動轉換
 # ==========================================
 with tab1:
     st.subheader("單筆手動轉換")
