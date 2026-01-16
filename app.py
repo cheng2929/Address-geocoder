@@ -5,7 +5,9 @@ from pyproj import Transformer
 import time
 
 # --- 頁面設定 ---
-st.set_page_config(page_title="地址座標轉換神器", page_icon="🗺️", layout="wide")
+# 修改點 1: page_icon 改成讀取圖片檔 'icon.png'
+# 請確保您有將 icon.png 上傳到 GitHub 同一層目錄
+st.set_page_config(page_title="地址座標轉換神器", page_icon="icon.png", layout="wide")
 
 st.title("🗺️ 地址與座標轉換工具")
 
@@ -42,11 +44,11 @@ def address_to_coords(gmaps, addr):
     except Exception as e:
         return None, None, None, None
 
-# --- 介面分頁 (已互換順序) ---
+# --- 介面分頁 ---
 tab1, tab2 = st.tabs(["🔍 單筆轉換 (手動輸入)", "📂 批次轉換 (檔案上傳)"])
 
 # ==========================================
-# 分頁 1: 單筆手動轉換 (原本在後面，現在移到前面)
+# 分頁 1: 單筆手動轉換
 # ==========================================
 with tab1:
     st.subheader("單筆手動轉換")
@@ -57,6 +59,10 @@ with tab1:
         ("🏠 地址 ➔ 座標", "🌐 經緯度 (WGS84) ➔ TWD97", "📐 TWD97 ➔ 經緯度 (WGS84)"),
         horizontal=True
     )
+
+    # 修改點 2: 針對「地址轉座標」顯示特別註記
+    if mode == "🏠 地址 ➔ 座標":
+        st.info("💡 **提示**：此選項需使用 Google Maps API (請在左側輸入 Key)。右側兩個座標互轉功能則**完全免費**。")
     
     st.divider()
 
@@ -109,7 +115,7 @@ with tab1:
             st.markdown(f"[在 Google Maps 查看](http://googleusercontent.com/maps.google.com/?q={lat},{lng})")
 
 # ==========================================
-# 分頁 2: 批次轉換 (原本在前面，現在移到後面)
+# 分頁 2: 批次轉換
 # ==========================================
 with tab2:
     st.subheader("批次地址轉換")
