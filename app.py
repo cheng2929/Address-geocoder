@@ -9,6 +9,9 @@ st.set_page_config(page_title="地址座標轉換神器", page_icon="🗺️", l
 
 st.title("🗺️ 地址與座標轉換工具")
 
+# --- ⚠️ 重要聲明 (新增在此) ---
+st.warning("⚠️ **聲明：此APP為阿誠開發維護，因API超過額度須收費，未經允許請勿他用。**")
+
 # --- 初始化座標轉換器 (快取以提升效能) ---
 @st.cache_resource
 def get_transformers():
@@ -53,7 +56,7 @@ with tab1:
 
     if uploaded_file:
         if not api_key:
-            st.warning("⚠️ 批次地址轉換需要 Google Maps API Key，請在左側輸入。")
+            st.error("⚠️ 批次地址轉換需要 Google Maps API Key，請在左側輸入。")
         else:
             try:
                 # 讀取檔案
@@ -77,6 +80,9 @@ with tab1:
                         
                         lats, lngs, xs, ys = [], [], [], []
                         
+                        # 錯誤計數器
+                        error_count = 0
+                        
                         for i, addr in enumerate(df['address']):
                             lat, lng, x, y = address_to_coords(gmaps, addr)
                             lats.append(lat)
@@ -84,8 +90,14 @@ with tab1:
                             xs.append(x)
                             ys.append(y)
                             
+                            if lat is None:
+                                error_count += 1
+                            
                             progress_bar.progress((i + 1) / total)
                             status_text.text(f"處理中: {i+1}/{total}")
+                            
+                            # 稍微停頓避免API過載
+                            # time.sleep(0.05) 
                             
                         df['lat'] = lats
                         df['lon'] = lngs
@@ -93,6 +105,9 @@ with tab1:
                         df['twd97_y'] = ys
                         
                         st.success("轉換完成！")
+                        if error_count > 0:
+                            st.warning(f"注意：有 {error_count} 筆地址無法辨識或查無結果。")
+                            
                         st.dataframe(df)
                         
                         # 下載
@@ -135,34 +150,6 @@ with tab2:
                     with col1:
                         st.success("✅ WGS84 (經緯度)")
                         st.code(f"{lat}, {lng}")
-                        st.markdown(f"[在 Google Maps 查看](https://www.google.com/maps?q={lat},{lng})")
+                        st.markdown(f"[在 Google Maps 查看](http://googleusercontent.com/maps.google.com/?q={lat},{lng})")
                     with col2:
-                        st.info("✅ TWD97 (二度分帶)")
-                        st.code(f"X: {x:.3f}\nY: {y:.3f}")
-                else:
-                    st.error("找不到該地址，請檢查輸入是否正確。")
-
-    # --- 模式 B: 經緯度轉 TWD97 ---
-    elif mode == "🌐 經緯度 (WGS84) ➔ TWD97":
-        col1, col2 = st.columns(2)
-        in_lat = col1.number_input("緯度 (Lat)", value=25.0339, format="%.6f")
-        in_lng = col2.number_input("經度 (Lon)", value=121.5644, format="%.6f")
-        
-        if st.button("轉換為 TWD97"):
-            # pyproj transform 輸入順序通常是 (經度, 緯度)
-            x, y = trans_to_twd97.transform(in_lng, in_lat)
-            st.success(f"轉換結果 (TWD97):")
-            st.code(f"X: {x:.3f}\nY: {y:.3f}")
-
-    # --- 模式 C: TWD97 轉 經緯度 ---
-    elif mode == "📐 TWD97 ➔ 經緯度 (WGS84)":
-        col1, col2 = st.columns(2)
-        in_x = col1.number_input("X 座標 (E)", value=306812.0, format="%.3f")
-        in_y = col2.number_input("Y 座標 (N)", value=2769213.0, format="%.3f")
-        
-        if st.button("轉換為經緯度"):
-            # 這裡要注意，pyproj 轉回來會得到 (經度, 緯度)
-            lng, lat = trans_to_wgs84.transform(in_x, in_y)
-            st.success(f"轉換結果 (WGS84):")
-            st.code(f"緯度 (Lat): {lat:.6f}\n經度 (Lon): {lng:.6f}")
-            st.markdown(f"[在 Google Maps 查看](https://www.google.com/maps?q={lat},{lng})")
+                        st.info("✅
