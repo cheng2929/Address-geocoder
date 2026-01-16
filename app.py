@@ -11,7 +11,7 @@ import urllib3
 # --- 設定 ---
 urllib3.disable_warnings()
 
-# --- 頁面設定 (手機優化) ---
+# --- 頁面設定 ---
 try:
     icon_image = Image.open("icon.png")
     st.set_page_config(page_title="座標轉換通", page_icon=icon_image, layout="wide")
@@ -36,20 +36,43 @@ with st.sidebar:
     st.caption("若需「地址反查」請輸入 Key，純 GPS 轉換免輸入。")
 
 # ==========================================
-# 介面分頁 (GPS 優先)
+# 介面分頁
 # ==========================================
 tab1, tab2, tab3 = st.tabs(["📍 GPS 定位", "🔍 地址/座標互轉", "📂 批次轉換"])
 
 # ==========================================
-# 分頁 1: 目前定位 (手機核心功能) - 安全修正版
+# 分頁 1: 目前定位 (手機核心功能)
 # ==========================================
 with tab1:
+    # --- 新增：安裝教學區塊 (使用 expander 模擬按鈕效果) ---
+    with st.expander("📲【教學】如何將此 APP 固定在手機桌面？(iOS/Android)"):
+        c1, c2 = st.columns(2)
+        with c1:
+            st.markdown("### 🍎 iOS (iPhone)")
+            st.markdown("""
+            1. 使用 **Safari** 開啟此網頁。
+            2. 點擊下方中間的 **「分享」** 按鈕 (方框向上箭頭 <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/4/46/Apple_Share_icon.svg/1200px-Apple_Share_icon.svg.png" width="15"/>)。
+            3. 往下滑，選擇 **「加入主畫面」** (Add to Home Screen)。
+            4. 點擊右上角的 **「加入」**。
+            """, unsafe_allow_html=True)
+        with c2:
+            st.markdown("### 🤖 Android")
+            st.markdown("""
+            1. 使用 **Chrome** 開啟此網頁。
+            2. 點擊右上角的 **「選單」** (三個點圖示 ⋮)。
+            3. 選擇 **「加到主畫面」** 或 **「安裝應用程式」**。
+            4. 點擊 **「新增」** 或 **「安裝」**。
+            """)
+        st.info("💡 設定完成後，手機桌面上就會出現 APP 圖示，以後點擊即可全螢幕使用！")
+
+    st.divider()
+
     st.info("請點擊下方按鈕，並允許瀏覽器存取位置。")
     
     # 呼叫定位
     location = get_geolocation(component_key='get_geo')
 
-    # 修改點：多檢查 'coords' 是否存在
+    # 安全檢查
     if location and 'coords' in location:
         my_lat = location['coords']['latitude']
         my_lng = location['coords']['longitude']
@@ -80,11 +103,11 @@ with tab1:
         st_folium(m, width="100%", height=350)
         
     elif location and 'error' in location:
-        # 如果是錯誤訊息，顯示出來
         st.error(f"定位失敗，請檢查瀏覽器權限。錯誤代碼：{location['error']}")
         
     else:
-        st.warning("等待定位中... (請確認已點擊按鈕並允許權限)")
+        st.warning("等待定位中... (請確認手機 GPS 已開啟)")
+
 # ==========================================
 # 分頁 2: 單筆轉換 (工具箱)
 # ==========================================
@@ -108,7 +131,7 @@ with tab2:
                         x, y = trans_to_twd97.transform(lng, lat)
                         st.success("查詢成功")
                         st.code(f"X: {x:.3f}\nY: {y:.3f}")
-                        st.markdown(f"[開啟導航](https://www.google.com/maps/dir/?api=1&destination={lat},{lng})")
+                        st.markdown(f"[開啟導航](http://googleusercontent.com/maps.google.com/?q={lat},{lng})")
                     else:
                         st.error("查無結果")
                 except Exception as e:
@@ -127,10 +150,10 @@ with tab2:
         if st.button("轉換", use_container_width=True):
             lng, lat = trans_to_wgs84.transform(x, y)
             st.code(f"{lat:.6f}, {lng:.6f}")
-            st.markdown(f"[開啟導航](https://www.google.com/maps/dir/?api=1&destination={lat},{lng})")
+            st.markdown(f"[開啟導航](http://googleusercontent.com/maps.google.com/?q={lat},{lng})")
 
 # ==========================================
-# 分頁 3: 批次 (維持簡單)
+# 分頁 3: 批次
 # ==========================================
 with tab3:
     st.info("上傳 Excel/CSV (需含 address 欄位)")
