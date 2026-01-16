@@ -56,14 +56,13 @@ with st.sidebar:
 tab1, tab2, tab3 = st.tabs(["📍 GPS 與地圖", "🔍 地址/座標互轉", "📂 批次轉換"])
 
 # ==========================================
-# 分頁 1: GPS + Google My Maps 嵌入
+# 分頁 1: GPS + 地圖
 # ==========================================
 with tab1:
     # 教學區塊
     with st.expander("📲【教學】如何將此 APP 固定在手機桌面？"):
         c1, c2 = st.columns(2)
         with c1:
-            # iOS 分享圖示
             ios_share_icon = """<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#007AFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line></svg>"""
             st.markdown(f"### 🍎 iOS\nSafari 分享 ({ios_share_icon}) > 加入主畫面")
         with c2: 
@@ -93,25 +92,29 @@ with tab1:
 
     st.divider()
 
-    # 2. 地圖模式切換
-    # 將預設值改為 Google My Maps，方便您直接查看
-    map_mode = st.radio("選擇地圖模式：", ["🔗 Google My Maps (您的地圖)", "🗺️ 一般定位地圖 (可顯示紅點)"], horizontal=True)
+    # 2. 地圖模式切換 (順序已對調，預設為一般定位地圖)
+    map_mode = st.radio("選擇地圖模式：", ["🗺️ 一般定位地圖 (可顯示紅點)", "🔗 潛勢地圖"], horizontal=True)
 
-    if map_mode == "🔗 Google My Maps (您的地圖)":
-        st.markdown("### 🔗 土石流潛勢地圖")
-        st.caption("此模式為嵌入檢視，無法顯示您的 GPS 紅點，請參考上方座標數據。")
+    if map_mode == "🔗 潛勢地圖":
         
         # --- 設定您的地圖連結 ---
         your_map_link = "https://www.google.com/maps/d/u/0/embed?mid=1eYJ5XO2j4dhyO1AGnrtbTAGhdL1Yyak&ehbc=2E312F"
         
-        # 顯示地圖
+        st.markdown("### 🔗 土石流潛勢地圖")
+        
+        # 一鍵跳轉按鈕
+        st.link_button("🚀 在 Google Maps App 開啟 (顯示定位點)", your_map_link)
+        
+        st.caption("嵌入模式無法顯示您的紅點位置，請點擊上方按鈕開啟 App 以查看定位。")
+        
+        # 顯示嵌入地圖
         try:
             components.iframe(your_map_link, height=600)
         except Exception as e:
             st.error("地圖載入失敗，請確認連結是否正確。")
 
     else:
-        # --- 原本的 Folium 地圖模式 ---
+        # --- 原本的 Folium 地圖模式 (預設顯示這個) ---
         st.write("### 🗺️ 定位地圖")
         map_center = [my_lat, my_lng] if my_lat else [22.75, 121.15]
         zoom_level = 15 if my_lat else 11
@@ -121,7 +124,7 @@ with tab1:
         if my_lat and my_lng:
             folium.Marker([my_lat, my_lng], popup="您的位置", icon=folium.Icon(color='red', icon='info-sign')).add_to(m)
         
-        # 保留載入 GeoJSON 的功能 (備用)
+        # 保留載入 GeoJSON 的功能
         def load_layer_safe(file_prefix, layer_name, style_func):
             target_file = None
             if os.path.exists(f"{file_prefix}.geojson"): target_file = f"{file_prefix}.geojson"
