@@ -11,12 +11,34 @@ import urllib3
 # --- 設定 ---
 urllib3.disable_warnings()
 
-# --- 頁面設定 ---
+# --- 頁面設定 (手機優化) ---
 try:
     icon_image = Image.open("icon.png")
     st.set_page_config(page_title="座標轉換通", page_icon=icon_image, layout="wide")
 except:
     st.set_page_config(page_title="座標轉換通", page_icon="📍", layout="wide")
+
+# --- 自定義 CSS (用於底部固定宣告) ---
+st.markdown("""
+    <style>
+        .footer {
+            position: fixed;
+            left: 0;
+            bottom: 0;
+            width: 100%;
+            background-color: #f0f2f6;
+            color: #555;
+            text-align: center;
+            padding: 10px;
+            font-size: 14px;
+            z-index: 999;
+        }
+        /* 為了不讓底部內容被 footer 擋住，增加頁面底部邊距 */
+        .main .block-container {
+            padding-bottom: 80px;
+        }
+    </style>
+""", unsafe_allow_html=True)
 
 st.title("📍 現場座標轉換通")
 
@@ -36,7 +58,7 @@ with st.sidebar:
     st.caption("若需「地址反查」請輸入 Key，純 GPS 轉換免輸入。")
 
 # ==========================================
-# 介面分頁
+# 介面分頁 (GPS 優先)
 # ==========================================
 tab1, tab2, tab3 = st.tabs(["📍 GPS 定位", "🔍 地址/座標互轉", "📂 批次轉換"])
 
@@ -44,14 +66,16 @@ tab1, tab2, tab3 = st.tabs(["📍 GPS 定位", "🔍 地址/座標互轉", "📂
 # 分頁 1: 目前定位 (手機核心功能)
 # ==========================================
 with tab1:
-    # --- 新增：安裝教學區塊 (使用 expander 模擬按鈕效果) ---
+    # --- 教學區塊 (已修復圖示破圖問題) ---
     with st.expander("📲【教學】如何將此 APP 固定在手機桌面？(iOS/Android)"):
         c1, c2 = st.columns(2)
         with c1:
+            # 使用更穩定的 SVG 圖示
+            ios_share_icon = """<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#007AFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line></svg>"""
             st.markdown("### 🍎 iOS (iPhone)")
-            st.markdown("""
+            st.markdown(f"""
             1. 使用 **Safari** 開啟此網頁。
-            2. 點擊下方中間的 **「分享」** 按鈕 (方框向上箭頭 <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/4/46/Apple_Share_icon.svg/1200px-Apple_Share_icon.svg.png" width="15"/>)。
+            2. 點擊下方中間的 **「分享」** 按鈕 ({ios_share_icon})。
             3. 往下滑，選擇 **「加入主畫面」** (Add to Home Screen)。
             4. 點擊右上角的 **「加入」**。
             """, unsafe_allow_html=True)
@@ -153,7 +177,7 @@ with tab2:
             st.markdown(f"[開啟導航](http://googleusercontent.com/maps.google.com/?q={lat},{lng})")
 
 # ==========================================
-# 分頁 3: 批次
+# 分頁 3: 批次 (維持簡單)
 # ==========================================
 with tab3:
     st.info("上傳 Excel/CSV (需含 address 欄位)")
@@ -187,3 +211,6 @@ with tab3:
                 st.download_button("下載結果", df.to_csv(index=False).encode('utf-8-sig'), "result.csv", "text/csv", use_container_width=True)
             except Exception as e:
                 st.error(str(e))
+
+# --- 底部固定宣告 ---
+st.markdown('<div class="footer">Made with ❤️ by 阿誠</div>', unsafe_allow_html=True)
