@@ -41,7 +41,7 @@ with st.sidebar:
 tab1, tab2, tab3 = st.tabs(["📍 GPS 定位", "🔍 地址/座標互轉", "📂 批次轉換"])
 
 # ==========================================
-# 分頁 1: 目前定位 (手機核心功能)
+# 分頁 1: 目前定位 (手機核心功能) - 安全修正版
 # ==========================================
 with tab1:
     st.info("請點擊下方按鈕，並允許瀏覽器存取位置。")
@@ -49,7 +49,8 @@ with tab1:
     # 呼叫定位
     location = get_geolocation(component_key='get_geo')
 
-    if location:
+    # 修改點：多檢查 'coords' 是否存在
+    if location and 'coords' in location:
         my_lat = location['coords']['latitude']
         my_lng = location['coords']['longitude']
         accuracy = location['coords']['accuracy']
@@ -76,11 +77,14 @@ with tab1:
             icon=folium.Icon(color='red', icon='info-sign')
         ).add_to(m)
         
-        # 手機地圖高度設為 350px 比較剛好
         st_folium(m, width="100%", height=350)
+        
+    elif location and 'error' in location:
+        # 如果是錯誤訊息，顯示出來
+        st.error(f"定位失敗，請檢查瀏覽器權限。錯誤代碼：{location['error']}")
+        
     else:
-        st.warning("等待定位中... (請確認手機 GPS 已開啟)")
-
+        st.warning("等待定位中... (請確認已點擊按鈕並允許權限)")
 # ==========================================
 # 分頁 2: 單筆轉換 (工具箱)
 # ==========================================
