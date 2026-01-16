@@ -7,7 +7,7 @@ import time
 # --- 頁面設定 ---
 # 修改點 1: page_icon 改成讀取圖片檔 'icon.png'
 # 請確保您有將 icon.png 上傳到 GitHub 同一層目錄
-st.set_page_config(page_title="地址座標轉換神器", page_icon="icon.png", layout="wide")
+st.set_page_config(page_title="地址座標轉換神器", page_icon="new_icon.png", layout="wide")
 
 st.title("🗺️ 地址與座標轉換工具")
 
@@ -62,7 +62,7 @@ with tab1:
 
     # 修改點 2: 針對「地址轉座標」顯示特別註記
     if mode == "🏠 地址 ➔ 座標":
-        st.info("💡 **提示**：此選項需使用 Google Maps API (請在左側輸入 Key)。右側兩個座標互轉功能則**完全免費**。")
+        st.info("💡 **提示**：地址轉座標此選項需使用 Google Maps API (請在左側輸入 Key)。其餘兩個座標互轉功能則**完全免費**。")
     
     st.divider()
 
