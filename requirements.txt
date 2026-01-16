@@ -2,4 +2,8 @@ streamlit
 pandas
 googlemaps
 pyproj
-openpyxl
+Pillow
+folium
+streamlit-folium
+streamlit-js-eval
+urllib3
