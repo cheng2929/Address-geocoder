@@ -62,7 +62,7 @@ with st.sidebar:
 
     st.divider()
     
-    # --- 教學區塊 (已移至側欄) ---
+    # --- 教學區塊 ---
     with st.expander("📲 APP 安裝教學 (iOS/Android)"):
         c1, c2 = st.columns(2)
         with c1:
@@ -79,7 +79,7 @@ with st.sidebar:
 tab1, tab2, tab3, tab4, tab5 = st.tabs(["📍 GPS 定位", "📝 點位紀錄", "🔗 潛勢地圖", "🔍 單筆轉換", "📂 批次轉換"])
 
 # ==========================================
-# 分頁 1: 純 GPS 定位 + 儲存功能
+# 分頁 1: 純 GPS 定位 + 地圖 + 儲存功能
 # ==========================================
 with tab1:
     # GPS 定位功能
@@ -101,10 +101,25 @@ with tab1:
 
         st.divider()
         
-        # --- 儲存點位區塊 ---
+        # --- (已對調) 先顯示地圖 ---
+        st.markdown("### 🗺️ 定位地圖")
+        map_center = [my_lat, my_lng] if my_lat else [22.75, 121.15]
+        zoom_level = 16 if my_lat else 11
+        
+        m = folium.Map(location=map_center, zoom_start=zoom_level)
+
+        if my_lat and my_lng:
+            folium.Marker([my_lat, my_lng], popup="您的位置", icon=folium.Icon(color='red', icon='info-sign')).add_to(m)
+        
+        folium.LayerControl().add_to(m)
+        st_folium(m, width="100%", height=400)
+
+        st.divider()
+
+        # --- (已對調) 再顯示儲存區塊 ---
         st.markdown("### 💾 儲存點位")
         
-        # 1. 新增：地點註記輸入框
+        # 1. 地點註記輸入框
         point_note = st.text_input("📝 地點註記 (選填)", placeholder="例如：大鳥村1號旁電桿、崩塌地前緣...")
 
         # 2. 儲存按鈕
@@ -113,10 +128,10 @@ with tab1:
             tz = timezone(timedelta(hours=8))
             now_str = datetime.now(tz).strftime("%Y-%m-%d %H:%M:%S")
             
-            # 加入紀錄列表 (含註記)
+            # 加入紀錄列表
             new_record = {
                 "時間": now_str,
-                "註記": point_note,  # 新增欄位
+                "註記": point_note,
                 "經度 (Lon)": my_lng,
                 "緯度 (Lat)": my_lat,
                 "TWD97_X": my_x,
@@ -125,31 +140,12 @@ with tab1:
             }
             st.session_state['saved_points'].append(new_record)
             st.toast(f"✅ 已儲存！目前共 {len(st.session_state['saved_points'])} 筆", icon="💾")
-            
-            # 提示使用者
             st.caption(f"已紀錄：{point_note if point_note else '(無註記)'}")
 
     elif location and 'error' in location:
         st.error(f"定位失敗: {location['error']}")
     else:
         st.info("請點擊下方按鈕獲取定位")
-
-    st.divider()
-
-    # --- 定位地圖 ---
-    st.markdown("### 🗺️ 定位地圖")
-    map_center = [my_lat, my_lng] if my_lat else [22.75, 121.15]
-    zoom_level = 16 if my_lat else 11
-    
-    m = folium.Map(location=map_center, zoom_start=zoom_level)
-
-    if my_lat and my_lng:
-        # 如果有註記，顯示在 Popup 裡
-        popup_text = f"您的位置<br>{point_note}" if 'point_note' in locals() and point_note else "您的位置"
-        folium.Marker([my_lat, my_lng], popup=popup_text, icon=folium.Icon(color='red', icon='info-sign')).add_to(m)
-    
-    folium.LayerControl().add_to(m)
-    st_folium(m, width="100%", height=400)
 
 # ==========================================
 # 分頁 2: 點位紀錄
@@ -161,7 +157,7 @@ with tab2:
         # 轉成 DataFrame 顯示
         df_records = pd.DataFrame(st.session_state['saved_points'])
         
-        # 顯示表格 (包含新的註記欄位)
+        # 顯示表格
         st.dataframe(df_records, use_container_width=True)
         
         col_dl, col_clear = st.columns([1, 1])
