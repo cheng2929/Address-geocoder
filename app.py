@@ -55,84 +55,93 @@ with st.sidebar:
 tab1, tab2, tab3 = st.tabs(["📍 GPS 與防災地圖", "🔍 地址/座標互轉", "📂 批次轉換"])
 
 # ==========================================
-# 分頁 1: 目前定位 + 土石流圖層
+# 分頁 1: 目前定位 + 土石流圖層 (萬能修復版)
 # ==========================================
 with tab1:
-    # 教學區塊 (摺疊)
+    # 教學區塊
     with st.expander("📲【教學】如何將此 APP 固定在手機桌面？"):
         c1, c2 = st.columns(2)
-        with c1:
-            st.markdown("### 🍎 iOS")
-            st.markdown("Safari 分享 > 加入主畫面")
-        with c2:
-            st.markdown("### 🤖 Android")
-            st.markdown("Chrome 選單 > 加到主畫面")
-
+        with c1: st.markdown("### 🍎 iOS\nSafari 分享 > 加入主畫面")
+        with c2: st.markdown("### 🤖 Android\nChrome 選單 > 加到主畫面")
     st.divider()
     
     # 定位功能
-    st.info("點擊按鈕獲取定位 (需允許權限)")
     location = get_geolocation(component_key='get_geo')
-    
-    # 預設地圖中心 (台東市) - 如果沒定位到就顯示這裡
-    map_center = [22.75, 121.15]
+    map_center = [22.75, 121.15] # 預設台東
     zoom_level = 11
-    
     my_lat, my_lng = None, None
 
     if location and 'coords' in location:
         my_lat = location['coords']['latitude']
         my_lng = location['coords']['longitude']
         acc = location['coords']['accuracy']
-        
         my_x, my_y = trans_to_twd97.transform(my_lng, my_lat)
         st.success(f"✅ 定位成功 (誤差 {acc:.0f}m)")
-        
-        c1, c2 = st.columns(2)
-        with c1: st.metric("TWD97 X", f"{my_x:.3f}")
-        with c2: st.metric("TWD97 Y", f"{my_y:.3f}")
-        
-        # 更新地圖中心為使用者位置
         map_center = [my_lat, my_lng]
-        zoom_level = 16
-
+        zoom_level = 15
     elif location and 'error' in location:
         st.error(f"定位失敗: {location['error']}")
 
-    # --- 建立地圖 ---
+    # --- 🗺️ 建立地圖 ---
     st.write("### 🗺️ 防災地圖 (含土石流潛勢)")
     m = folium.Map(location=map_center, zoom_start=zoom_level)
 
-    # 1. 加上使用者位置圖釘
     if my_lat and my_lng:
-        folium.Marker(
-            [my_lat, my_lng], popup="您的位置", icon=folium.Icon(color='red', icon='info-sign')
-        ).add_to(m)
+        folium.Marker([my_lat, my_lng], popup="您的位置", icon=folium.Icon(color='red', icon='info-sign')).add_to(m)
 
-    # 2. 載入「土石流潛勢溪流」圖層 (藍色線條)
-    if os.path.exists("streams.geojson"):
-        folium.GeoJson(
-            "streams.geojson",
-            name="🌊 土石流潛勢溪流",
-            style_function=lambda x: {
-                'color': 'blue', 'weight': 3, 'opacity': 0.7
-            },
-            tooltip=folium.GeoJsonTooltip(fields=['Debrisno'], aliases=['編號:']) # 依據欄位名稱調整
-        ).add_to(m)
-    
-    # 3. 載入「土石流影響範圍」圖層 (黃色區塊)
-    if os.path.exists("areas.geojson"):
-        folium.GeoJson(
-            "areas.geojson",
-            name="⚠️ 土石流影響範圍",
-            style_function=lambda x: {
-                'fillColor': '#ffcc00', 'color': 'orange', 'weight': 1, 'fillOpacity': 0.4
-            }
-        ).add_to(m)
+    # --- 🔧 萬能圖層讀取函式 (修復所有 JSON 問題) ---
+    def load_layer_safe(file_prefix, layer_name, style_func, tooltip_fields=None):
+        # 1. 自動找檔名 (不管是 .geojson 還是 .geojson.json)
+        target_file = None
+        if os.path.exists(f"{file_prefix}.geojson"):
+            target_file = f"{file_prefix}.geojson"
+        elif os.path.exists(f"{file_prefix}.geojson.json"):
+            target_file = f"{file_prefix}.geojson.json"
+        
+        if not target_file:
+            st.warning(f"⚠️ 找不到 {layer_name} 的檔案 (需上傳 {file_prefix}.geojson)")
+            return
 
-    # 4. 加入圖層控制器 (讓使用者可以開關圖層)
+        try:
+            # 2. 手動讀取 JSON (解決編碼與格式問題)
+            with open(target_file, "r", encoding="utf-8-sig") as f:
+                data = json.load(f)
+            
+            # 3. 自動修正 Mapshaper 的 List [...] 格式
+            if isinstance(data, list):
+                # 如果是清單，取出第一個物件
+                data = data[0]
+            
+            # 4. 加入地圖
+            folium.GeoJson(
+                data,
+                name=layer_name,
+                style_function=style_func,
+                tooltip=folium.GeoJsonTooltip(fields=tooltip_fields) if tooltip_fields else None
+            ).add_to(m)
+            # st.toast(f"✅ {layer_name} 載入成功") # 測試用提示
+            
+        except json.JSONDecodeError:
+            st.error(f"❌ {layer_name} 格式錯誤：可能是 Git LFS 指標檔或檔案為空。請確認 GitHub 檔案內容是否為 JSON。")
+        except Exception as e:
+            st.error(f"❌ {layer_name} 載入失敗: {str(e)}")
+
+    # 載入「土石流潛勢溪流」 (藍色)
+    load_layer_safe(
+        "streams", 
+        "🌊 土石流潛勢溪流", 
+        lambda x: {'color': 'blue', 'weight': 3, 'opacity': 0.7},
+        ['Debrisno'] # 欄位名稱要對應 JSON 內容
+    )
+
+    # 載入「土石流影響範圍」 (黃色)
+    load_layer_safe(
+        "areas", 
+        "⚠️ 土石流影響範圍", 
+        lambda x: {'fillColor': '#ffcc00', 'color': 'orange', 'weight': 1, 'fillOpacity': 0.4}
+    )
+
     folium.LayerControl().add_to(m)
-
     st_folium(m, width="100%", height=500)
 
 # ==========================================
