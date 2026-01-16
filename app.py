@@ -61,20 +61,22 @@ with st.sidebar:
         st.metric("已紀錄點位", f"{len(st.session_state['saved_points'])} 筆")
 
 # ==========================================
-# 介面分頁 (改為 5 個分頁)
+# 介面分頁 (已調整順序)
 # ==========================================
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["📍 GPS 定位", "🔗 潛勢地圖", "🔍 單筆轉換", "📂 批次轉換", "📝 點位紀錄"])
+# 順序：1.GPS -> 2.紀錄 -> 3.地圖 -> 4.單筆 -> 5.批次
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["📍 GPS 定位", "📝 點位紀錄", "🔗 潛勢地圖", "🔍 單筆轉換", "📂 批次轉換"])
 
 # ==========================================
 # 分頁 1: 純 GPS 定位 + 儲存功能
 # ==========================================
 with tab1:
-    # 教學區塊
+    # 教學區塊 (已修復亂碼問題)
     with st.expander("📲【教學】如何將此 APP 固定在手機桌面？"):
         c1, c2 = st.columns(2)
         with c1:
             ios_share_icon = """<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#007AFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line></svg>"""
-            st.markdown(f"### 🍎 iOS\nSafari 分享 ({ios_share_icon}) > 加入主畫面")
+            # 關鍵修正：加入 unsafe_allow_html=True
+            st.markdown(f"### 🍎 iOS\nSafari 分享 ({ios_share_icon}) > 加入主畫面", unsafe_allow_html=True)
         with c2: 
             st.markdown("### 🤖 Android\nChrome 選單 > 加到主畫面")
     st.divider()
@@ -96,7 +98,7 @@ with tab1:
         with c1: st.metric("TWD97 X", f"{my_x:.3f}")
         with c2: st.metric("TWD97 Y", f"{my_y:.3f}")
 
-        # --- 新增：儲存點位按鈕 ---
+        # 儲存點位按鈕
         col_save, col_note = st.columns([1, 3])
         with col_save:
             if st.button("💾 儲存目前點位", type="primary", use_container_width=True):
@@ -114,10 +116,10 @@ with tab1:
                     "誤差(m)": round(acc, 1)
                 }
                 st.session_state['saved_points'].append(new_record)
-                st.toast(f"✅ 已儲存點位！目前共 {len(st.session_state['saved_points'])} 筆", icon="💾")
+                st.toast(f"✅ 已儲存！目前共 {len(st.session_state['saved_points'])} 筆", icon="💾")
         
         with col_note:
-            st.caption("💡 點擊儲存後，資料會暫存於「📝 點位紀錄」分頁，離開網頁前請記得匯出。")
+            st.caption("💡 資料暫存於「📝 點位紀錄」分頁，離開前請記得匯出。")
 
     elif location and 'error' in location:
         st.error(f"定位失敗: {location['error']}")
@@ -140,9 +142,46 @@ with tab1:
     st_folium(m, width="100%", height=400)
 
 # ==========================================
-# 分頁 2: 潛勢地圖
+# 分頁 2: 點位紀錄 (已移動至此)
 # ==========================================
 with tab2:
+    st.subheader("📝 現場點位紀錄表")
+    
+    if len(st.session_state['saved_points']) > 0:
+        # 轉成 DataFrame 顯示
+        df_records = pd.DataFrame(st.session_state['saved_points'])
+        
+        # 顯示表格
+        st.dataframe(df_records, use_container_width=True)
+        
+        col_dl, col_clear = st.columns([1, 1])
+        
+        with col_dl:
+            # 匯出 CSV 按鈕
+            csv = df_records.to_csv(index=False).encode('utf-8-sig')
+            file_name = f"gps_records_{datetime.now().strftime('%Y%m%d_%H%M')}.csv"
+            st.download_button(
+                label="📥 匯出紀錄 (CSV)",
+                data=csv,
+                file_name=file_name,
+                mime="text/csv",
+                type="primary",
+                use_container_width=True
+            )
+            
+        with col_clear:
+            # 清除按鈕
+            if st.button("🗑️ 清空所有紀錄", type="secondary", use_container_width=True):
+                st.session_state['saved_points'] = []
+                st.rerun()
+    else:
+        st.info("目前沒有紀錄。請至「📍 GPS 定位」分頁點擊「儲存目前點位」。")
+        st.caption("注意：重新整理網頁會清空未下載的紀錄，請記得定期匯出。")
+
+# ==========================================
+# 分頁 3: 潛勢地圖
+# ==========================================
+with tab3:
     st.markdown("### 🔗 土石流潛勢地圖")
     your_map_link = "https://www.google.com/maps/d/u/0/embed?mid=1eYJ5XO2j4dhyO1AGnrtbTAGhdL1Yyak&ehbc=2E312F"
     st.link_button("🚀 在 Google Maps App 開啟 (顯示定位點)", your_map_link, use_container_width=True)
@@ -153,9 +192,9 @@ with tab2:
         st.error("地圖載入失敗。")
 
 # ==========================================
-# 分頁 3: 單筆轉換
+# 分頁 4: 單筆轉換
 # ==========================================
-with tab3:
+with tab4:
     st.subheader("單筆手動轉換")
     mode = st.radio("功能", ("🏠 地址➔座標", "🌐 經緯度➔97", "📐 97➔經緯度"), horizontal=True)
     if mode == "🏠 地址➔座標":
@@ -192,9 +231,9 @@ with tab3:
             st.code(f"{lat:.6f}, {lng:.6f}")
 
 # ==========================================
-# 分頁 4: 批次轉換
+# 分頁 5: 批次轉換
 # ==========================================
-with tab4:
+with tab5:
     st.subheader("批次地址轉換")
     st.info("上傳 Excel/CSV (需含 address 欄位)")
     uploaded_file = st.file_uploader("選擇檔案", type=['csv', 'xlsx'])
@@ -220,43 +259,6 @@ with tab4:
             st.dataframe(df.head())
             st.download_button("下載結果", df.to_csv(index=False).encode('utf-8-sig'), "result.csv", "text/csv", use_container_width=True)
         except Exception as e: st.error(str(e))
-
-# ==========================================
-# 分頁 5: 點位紀錄 (新增功能)
-# ==========================================
-with tab5:
-    st.subheader("📝 現場點位紀錄表")
-    
-    if len(st.session_state['saved_points']) > 0:
-        # 轉成 DataFrame 顯示
-        df_records = pd.DataFrame(st.session_state['saved_points'])
-        
-        # 顯示表格
-        st.dataframe(df_records, use_container_width=True)
-        
-        col_dl, col_clear = st.columns([1, 1])
-        
-        with col_dl:
-            # 匯出 CSV 按鈕
-            csv = df_records.to_csv(index=False).encode('utf-8-sig')
-            file_name = f"gps_records_{datetime.now().strftime('%Y%m%d_%H%M')}.csv"
-            st.download_button(
-                label="📥 匯出紀錄 (CSV)",
-                data=csv,
-                file_name=file_name,
-                mime="text/csv",
-                type="primary",
-                use_container_width=True
-            )
-            
-        with col_clear:
-            # 清除按鈕
-            if st.button("🗑️ 清空所有紀錄", type="secondary", use_container_width=True):
-                st.session_state['saved_points'] = []
-                st.rerun()
-    else:
-        st.info("目前沒有紀錄。請至「📍 GPS 定位」分頁點擊「儲存目前點位」。")
-        st.caption("注意：重新整理網頁會清空未下載的紀錄，請記得定期匯出。")
 
 # --- 底部宣告 ---
 st.markdown('<div class="footer">Made with ❤️ by 阿誠</div>', unsafe_allow_html=True)
