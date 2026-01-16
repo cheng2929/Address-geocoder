@@ -152,4 +152,30 @@ with tab2:
                         st.code(f"{lat}, {lng}")
                         st.markdown(f"[在 Google Maps 查看](http://googleusercontent.com/maps.google.com/?q={lat},{lng})")
                     with col2:
-                        st.info("✅
+                        st.info("✅ TWD97 (二度分帶)")
+                        st.code(f"X: {x:.3f}\nY: {y:.3f}")
+                else:
+                    st.error("找不到該地址，請檢查輸入是否正確。")
+
+    # --- 模式 B: 經緯度轉 TWD97 ---
+    elif mode == "🌐 經緯度 (WGS84) ➔ TWD97":
+        col1, col2 = st.columns(2)
+        in_lat = col1.number_input("緯度 (Lat)", value=25.0339, format="%.6f")
+        in_lng = col2.number_input("經度 (Lon)", value=121.5644, format="%.6f")
+        
+        if st.button("轉換為 TWD97"):
+            x, y = trans_to_twd97.transform(in_lng, in_lat)
+            st.success(f"轉換結果 (TWD97):")
+            st.code(f"X: {x:.3f}\nY: {y:.3f}")
+
+    # --- 模式 C: TWD97 轉 經緯度 ---
+    elif mode == "📐 TWD97 ➔ 經緯度 (WGS84)":
+        col1, col2 = st.columns(2)
+        in_x = col1.number_input("X 座標 (E)", value=306812.0, format="%.3f")
+        in_y = col2.number_input("Y 座標 (N)", value=2769213.0, format="%.3f")
+        
+        if st.button("轉換為經緯度"):
+            lng, lat = trans_to_wgs84.transform(in_x, in_y)
+            st.success(f"轉換結果 (WGS84):")
+            st.code(f"緯度 (Lat): {lat:.6f}\n經度 (Lon): {lng:.6f}")
+            st.markdown(f"[在 Google Maps 查看](http://googleusercontent.com/maps.google.com/?q={lat},{lng})")
