@@ -51,12 +51,12 @@ with st.sidebar:
     st.caption("若需「地址反查」請輸入 Key。")
 
 # ==========================================
-# 介面分頁
+# 介面分頁 (改為 4 個分頁)
 # ==========================================
-tab1, tab2, tab3 = st.tabs(["📍 GPS 與地圖", "🔍 地址/座標互轉", "📂 批次轉換"])
+tab1, tab2, tab3, tab4 = st.tabs(["📍 GPS 定位", "🔗 潛勢地圖", "🔍 單筆轉換", "📂 批次轉換"])
 
 # ==========================================
-# 分頁 1: GPS + 地圖
+# 分頁 1: 純 GPS 定位 + 定位地圖
 # ==========================================
 with tab1:
     # 教學區塊
@@ -69,7 +69,7 @@ with tab1:
             st.markdown("### 🤖 Android\nChrome 選單 > 加到主畫面")
     st.divider()
     
-    # 1. GPS 定位功能
+    # GPS 定位功能
     location = get_geolocation(component_key='get_geo')
     
     my_lat, my_lng, my_x, my_y, acc = None, None, None, None, None
@@ -92,61 +92,59 @@ with tab1:
 
     st.divider()
 
-    # 2. 地圖模式切換 (順序已對調，預設為一般定位地圖)
-    map_mode = st.radio("選擇地圖模式：", ["🗺️ 一般定位地圖 (可顯示紅點)", "🔗 潛勢地圖"], horizontal=True)
+    # --- 定位地圖 (顯示紅點) ---
+    st.markdown("### 🗺️ 定位地圖")
+    map_center = [my_lat, my_lng] if my_lat else [22.75, 121.15]
+    zoom_level = 16 if my_lat else 11
+    
+    m = folium.Map(location=map_center, zoom_start=zoom_level)
 
-    if map_mode == "🔗 潛勢地圖":
+    if my_lat and my_lng:
+        folium.Marker([my_lat, my_lng], popup="您的位置", icon=folium.Icon(color='red', icon='info-sign')).add_to(m)
+    
+    # 萬能圖層讀取函式 (保留功能，但不一定顯示，避免版面亂)
+    def load_layer_safe(file_prefix, layer_name, style_func):
+        target_file = None
+        if os.path.exists(f"{file_prefix}.geojson"): target_file = f"{file_prefix}.geojson"
+        elif os.path.exists(f"{file_prefix}.geojson.json"): target_file = f"{file_prefix}.geojson.json"
         
-        # --- 設定您的地圖連結 ---
-        your_map_link = "https://www.google.com/maps/d/u/0/embed?mid=1eYJ5XO2j4dhyO1AGnrtbTAGhdL1Yyak&ehbc=2E312F"
-        
-        st.markdown("### 🔗 土石流潛勢地圖")
-        
-        # 一鍵跳轉按鈕
-        st.link_button("🚀 在 Google Maps App 開啟 (顯示定位點)", your_map_link)
-        
-        st.caption("嵌入模式無法顯示您的紅點位置，請點擊上方按鈕開啟 App 以查看定位。")
-        
-        # 顯示嵌入地圖
-        try:
-            components.iframe(your_map_link, height=600)
-        except Exception as e:
-            st.error("地圖載入失敗，請確認連結是否正確。")
+        if target_file:
+            try:
+                with open(target_file, "r", encoding="utf-8-sig") as f: data = json.load(f)
+                if isinstance(data, list): data = data[0]
+                folium.GeoJson(data, name=layer_name, style_function=style_func).add_to(m)
+            except: pass
 
-    else:
-        # --- 原本的 Folium 地圖模式 (預設顯示這個) ---
-        st.write("### 🗺️ 定位地圖")
-        map_center = [my_lat, my_lng] if my_lat else [22.75, 121.15]
-        zoom_level = 15 if my_lat else 11
-        
-        m = folium.Map(location=map_center, zoom_start=zoom_level)
+    load_layer_safe("streams", "🌊 土石流潛勢溪流", lambda x: {'color': 'blue', 'weight': 3, 'opacity': 0.7})
+    load_layer_safe("areas", "⚠️ 土石流影響範圍", lambda x: {'fillColor': '#ffcc00', 'color': 'orange', 'weight': 1, 'fillOpacity': 0.4})
 
-        if my_lat and my_lng:
-            folium.Marker([my_lat, my_lng], popup="您的位置", icon=folium.Icon(color='red', icon='info-sign')).add_to(m)
-        
-        # 保留載入 GeoJSON 的功能
-        def load_layer_safe(file_prefix, layer_name, style_func):
-            target_file = None
-            if os.path.exists(f"{file_prefix}.geojson"): target_file = f"{file_prefix}.geojson"
-            elif os.path.exists(f"{file_prefix}.geojson.json"): target_file = f"{file_prefix}.geojson.json"
-            
-            if target_file:
-                try:
-                    with open(target_file, "r", encoding="utf-8-sig") as f: data = json.load(f)
-                    if isinstance(data, list): data = data[0]
-                    folium.GeoJson(data, name=layer_name, style_function=style_func).add_to(m)
-                except: pass
-
-        load_layer_safe("streams", "🌊 土石流潛勢溪流", lambda x: {'color': 'blue', 'weight': 3, 'opacity': 0.7})
-        load_layer_safe("areas", "⚠️ 土石流影響範圍", lambda x: {'fillColor': '#ffcc00', 'color': 'orange', 'weight': 1, 'fillOpacity': 0.4})
-
-        folium.LayerControl().add_to(m)
-        st_folium(m, width="100%", height=500)
+    folium.LayerControl().add_to(m)
+    st_folium(m, width="100%", height=400)
 
 # ==========================================
-# 分頁 2: 單筆轉換
+# 分頁 2: 潛勢地圖 (Google My Maps)
 # ==========================================
 with tab2:
+    st.markdown("### 🔗 土石流潛勢地圖")
+    
+    # 您的地圖連結
+    your_map_link = "https://www.google.com/maps/d/u/0/embed?mid=1eYJ5XO2j4dhyO1AGnrtbTAGhdL1Yyak&ehbc=2E312F"
+    
+    # 一鍵跳轉按鈕
+    st.link_button("🚀 在 Google Maps App 開啟 (顯示定位點)", your_map_link, use_container_width=True)
+    st.caption("點擊上方按鈕可開啟手機 App 導航。下方為預覽視窗：")
+
+    # 顯示嵌入地圖
+    try:
+        components.iframe(your_map_link, height=600)
+    except Exception as e:
+        st.error("地圖載入失敗。")
+
+# ==========================================
+# 分頁 3: 單筆轉換
+# ==========================================
+with tab3:
+    st.subheader("單筆手動轉換")
     mode = st.radio("功能", ("🏠 地址➔座標", "🌐 經緯度➔97", "📐 97➔經緯度"), horizontal=True)
     if mode == "🏠 地址➔座標":
         addr = st.text_input("輸入地址")
@@ -182,9 +180,10 @@ with tab2:
             st.code(f"{lat:.6f}, {lng:.6f}")
 
 # ==========================================
-# 分頁 3: 批次
+# 分頁 4: 批次轉換
 # ==========================================
-with tab3:
+with tab4:
+    st.subheader("批次地址轉換")
     st.info("上傳 Excel/CSV (需含 address 欄位)")
     uploaded_file = st.file_uploader("選擇檔案", type=['csv', 'xlsx'])
     if uploaded_file and google_api_key and st.button("開始轉換", type="primary", use_container_width=True):
