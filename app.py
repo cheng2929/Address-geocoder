@@ -9,7 +9,7 @@ st.set_page_config(page_title="地址座標轉換神器", page_icon="🗺️", l
 
 st.title("🗺️ 地址與座標轉換工具")
 
-# --- ⚠️ 重要聲明 (新增在此) ---
+# --- ⚠️ 重要聲明 ---
 st.warning("⚠️ **聲明：此APP為阿誠開發維護，因API超過額度須收費，未經允許請勿他用。**")
 
 # --- 初始化座標轉換器 (快取以提升效能) ---
@@ -42,85 +42,13 @@ def address_to_coords(gmaps, addr):
     except Exception as e:
         return None, None, None, None
 
-# --- 介面分頁 ---
-tab1, tab2 = st.tabs(["📂 批次轉換 (檔案上傳)", "🔍 單筆轉換 (手動輸入)"])
+# --- 介面分頁 (已互換順序) ---
+tab1, tab2 = st.tabs(["🔍 單筆轉換 (手動輸入)", "📂 批次轉換 (檔案上傳)"])
 
 # ==========================================
-# 分頁 1: 批次轉換 (原本的功能)
+# 分頁 1: 單筆手動轉換 (原本在後面，現在移到前面)
 # ==========================================
 with tab1:
-    st.subheader("批次地址轉換")
-    st.info("請上傳包含 `address` 欄位的 CSV 或 Excel 檔案。")
-    
-    uploaded_file = st.file_uploader("上傳檔案", type=['csv', 'xlsx'])
-
-    if uploaded_file:
-        if not api_key:
-            st.error("⚠️ 批次地址轉換需要 Google Maps API Key，請在左側輸入。")
-        else:
-            try:
-                # 讀取檔案
-                if uploaded_file.name.endswith('.csv'):
-                    df = pd.read_csv(uploaded_file)
-                else:
-                    df = pd.read_excel(uploaded_file)
-                
-                st.write("預覽資料：", df.head())
-
-                if 'address' not in df.columns:
-                    st.error("錯誤：找不到 `address` 欄位。")
-                else:
-                    if st.button("開始批次轉換", type="primary"):
-                        gmaps = googlemaps.Client(key=api_key)
-                        
-                        # 進度條
-                        progress_bar = st.progress(0)
-                        status_text = st.empty()
-                        total = len(df)
-                        
-                        lats, lngs, xs, ys = [], [], [], []
-                        
-                        # 錯誤計數器
-                        error_count = 0
-                        
-                        for i, addr in enumerate(df['address']):
-                            lat, lng, x, y = address_to_coords(gmaps, addr)
-                            lats.append(lat)
-                            lngs.append(lng)
-                            xs.append(x)
-                            ys.append(y)
-                            
-                            if lat is None:
-                                error_count += 1
-                            
-                            progress_bar.progress((i + 1) / total)
-                            status_text.text(f"處理中: {i+1}/{total}")
-                            
-                            # 稍微停頓避免API過載
-                            # time.sleep(0.05) 
-                            
-                        df['lat'] = lats
-                        df['lon'] = lngs
-                        df['twd97_x'] = xs
-                        df['twd97_y'] = ys
-                        
-                        st.success("轉換完成！")
-                        if error_count > 0:
-                            st.warning(f"注意：有 {error_count} 筆地址無法辨識或查無結果。")
-                            
-                        st.dataframe(df)
-                        
-                        # 下載
-                        csv = df.to_csv(index=False).encode('utf-8-sig')
-                        st.download_button("下載結果 (CSV)", csv, "result.csv", "text/csv")
-
-            except Exception as e:
-                st.error(f"發生錯誤: {e}")
-
-# ==========================================
-# 分頁 2: 單筆手動轉換 (新功能)
-# ==========================================
-with tab2:
     st.subheader("單筆手動轉換")
     
     # 選擇轉換模式
@@ -179,3 +107,72 @@ with tab2:
             st.success(f"轉換結果 (WGS84):")
             st.code(f"緯度 (Lat): {lat:.6f}\n經度 (Lon): {lng:.6f}")
             st.markdown(f"[在 Google Maps 查看](http://googleusercontent.com/maps.google.com/?q={lat},{lng})")
+
+# ==========================================
+# 分頁 2: 批次轉換 (原本在前面，現在移到後面)
+# ==========================================
+with tab2:
+    st.subheader("批次地址轉換")
+    st.info("請上傳包含 `address` 欄位的 CSV 或 Excel 檔案。")
+    
+    uploaded_file = st.file_uploader("上傳檔案", type=['csv', 'xlsx'])
+
+    if uploaded_file:
+        if not api_key:
+            st.error("⚠️ 批次地址轉換需要 Google Maps API Key，請在左側輸入。")
+        else:
+            try:
+                # 讀取檔案
+                if uploaded_file.name.endswith('.csv'):
+                    df = pd.read_csv(uploaded_file)
+                else:
+                    df = pd.read_excel(uploaded_file)
+                
+                st.write("預覽資料：", df.head())
+
+                if 'address' not in df.columns:
+                    st.error("錯誤：找不到 `address` 欄位。")
+                else:
+                    if st.button("開始批次轉換", type="primary"):
+                        gmaps = googlemaps.Client(key=api_key)
+                        
+                        # 進度條
+                        progress_bar = st.progress(0)
+                        status_text = st.empty()
+                        total = len(df)
+                        
+                        lats, lngs, xs, ys = [], [], [], []
+                        
+                        # 錯誤計數器
+                        error_count = 0
+                        
+                        for i, addr in enumerate(df['address']):
+                            lat, lng, x, y = address_to_coords(gmaps, addr)
+                            lats.append(lat)
+                            lngs.append(lng)
+                            xs.append(x)
+                            ys.append(y)
+                            
+                            if lat is None:
+                                error_count += 1
+                            
+                            progress_bar.progress((i + 1) / total)
+                            status_text.text(f"處理中: {i+1}/{total}")
+                            
+                        df['lat'] = lats
+                        df['lon'] = lngs
+                        df['twd97_x'] = xs
+                        df['twd97_y'] = ys
+                        
+                        st.success("轉換完成！")
+                        if error_count > 0:
+                            st.warning(f"注意：有 {error_count} 筆地址無法辨識或查無結果。")
+                            
+                        st.dataframe(df)
+                        
+                        # 下載
+                        csv = df.to_csv(index=False).encode('utf-8-sig')
+                        st.download_button("下載結果 (CSV)", csv, "result.csv", "text/csv")
+
+            except Exception as e:
+                st.error(f"發生錯誤: {e}")
