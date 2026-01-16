@@ -49,19 +49,31 @@ def get_transformers():
 
 trans_to_twd97, trans_to_wgs84 = get_transformers()
 
-# --- 側邊欄 ---
+# --- 側邊欄 (含設定與教學) ---
 with st.sidebar:
     st.header("⚙️ 設定")
     google_api_key = st.text_input("Google API Key", type="password")
     st.caption("若需「地址反查」請輸入 Key。")
     
-    # 側邊欄顯示目前紀錄筆數
+    # 顯示目前紀錄筆數
     if len(st.session_state['saved_points']) > 0:
         st.divider()
         st.metric("已紀錄點位", f"{len(st.session_state['saved_points'])} 筆")
 
+    st.divider()
+    
+    # --- 教學區塊 (已移至側欄) ---
+    with st.expander("📲 APP 安裝教學 (iOS/Android)"):
+        c1, c2 = st.columns(2)
+        with c1:
+            ios_share_icon = """<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#007AFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line></svg>"""
+            st.markdown(f"**🍎 iOS**\n\nSafari 分享 ({ios_share_icon}) > 加入主畫面", unsafe_allow_html=True)
+        with c2: 
+            st.markdown("**🤖 Android**\n\nChrome 選單 > 加到主畫面")
+        st.caption("設定後可從手機桌面全螢幕開啟。")
+
 # ==========================================
-# 介面分頁 (已調整順序)
+# 介面分頁
 # ==========================================
 # 順序：1.GPS -> 2.紀錄 -> 3.地圖 -> 4.單筆 -> 5.批次
 tab1, tab2, tab3, tab4, tab5 = st.tabs(["📍 GPS 定位", "📝 點位紀錄", "🔗 潛勢地圖", "🔍 單筆轉換", "📂 批次轉換"])
@@ -70,17 +82,6 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs(["📍 GPS 定位", "📝 點位紀錄", 
 # 分頁 1: 純 GPS 定位 + 儲存功能
 # ==========================================
 with tab1:
-    # 教學區塊 (已修復亂碼問題)
-    with st.expander("📲【教學】如何將此 APP 固定在手機桌面？"):
-        c1, c2 = st.columns(2)
-        with c1:
-            ios_share_icon = """<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#007AFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line></svg>"""
-            # 關鍵修正：加入 unsafe_allow_html=True
-            st.markdown(f"### 🍎 iOS\nSafari 分享 ({ios_share_icon}) > 加入主畫面", unsafe_allow_html=True)
-        with c2: 
-            st.markdown("### 🤖 Android\nChrome 選單 > 加到主畫面")
-    st.divider()
-    
     # GPS 定位功能
     location = get_geolocation(component_key='get_geo')
     
@@ -98,28 +99,35 @@ with tab1:
         with c1: st.metric("TWD97 X", f"{my_x:.3f}")
         with c2: st.metric("TWD97 Y", f"{my_y:.3f}")
 
-        # 儲存點位按鈕
-        col_save, col_note = st.columns([1, 3])
-        with col_save:
-            if st.button("💾 儲存目前點位", type="primary", use_container_width=True):
-                # 取得台灣時間
-                tz = timezone(timedelta(hours=8))
-                now_str = datetime.now(tz).strftime("%Y-%m-%d %H:%M:%S")
-                
-                # 加入紀錄列表
-                new_record = {
-                    "時間": now_str,
-                    "經度 (Lon)": my_lng,
-                    "緯度 (Lat)": my_lat,
-                    "TWD97_X": my_x,
-                    "TWD97_Y": my_y,
-                    "誤差(m)": round(acc, 1)
-                }
-                st.session_state['saved_points'].append(new_record)
-                st.toast(f"✅ 已儲存！目前共 {len(st.session_state['saved_points'])} 筆", icon="💾")
+        st.divider()
         
-        with col_note:
-            st.caption("💡 資料暫存於「📝 點位紀錄」分頁，離開前請記得匯出。")
+        # --- 儲存點位區塊 ---
+        st.markdown("### 💾 儲存點位")
+        
+        # 1. 新增：地點註記輸入框
+        point_note = st.text_input("📝 地點註記 (選填)", placeholder="例如：大鳥村1號旁電桿、崩塌地前緣...")
+
+        # 2. 儲存按鈕
+        if st.button("確認儲存", type="primary", use_container_width=True):
+            # 取得台灣時間
+            tz = timezone(timedelta(hours=8))
+            now_str = datetime.now(tz).strftime("%Y-%m-%d %H:%M:%S")
+            
+            # 加入紀錄列表 (含註記)
+            new_record = {
+                "時間": now_str,
+                "註記": point_note,  # 新增欄位
+                "經度 (Lon)": my_lng,
+                "緯度 (Lat)": my_lat,
+                "TWD97_X": my_x,
+                "TWD97_Y": my_y,
+                "誤差(m)": round(acc, 1)
+            }
+            st.session_state['saved_points'].append(new_record)
+            st.toast(f"✅ 已儲存！目前共 {len(st.session_state['saved_points'])} 筆", icon="💾")
+            
+            # 提示使用者
+            st.caption(f"已紀錄：{point_note if point_note else '(無註記)'}")
 
     elif location and 'error' in location:
         st.error(f"定位失敗: {location['error']}")
@@ -136,13 +144,15 @@ with tab1:
     m = folium.Map(location=map_center, zoom_start=zoom_level)
 
     if my_lat and my_lng:
-        folium.Marker([my_lat, my_lng], popup="您的位置", icon=folium.Icon(color='red', icon='info-sign')).add_to(m)
+        # 如果有註記，顯示在 Popup 裡
+        popup_text = f"您的位置<br>{point_note}" if 'point_note' in locals() and point_note else "您的位置"
+        folium.Marker([my_lat, my_lng], popup=popup_text, icon=folium.Icon(color='red', icon='info-sign')).add_to(m)
     
     folium.LayerControl().add_to(m)
     st_folium(m, width="100%", height=400)
 
 # ==========================================
-# 分頁 2: 點位紀錄 (已移動至此)
+# 分頁 2: 點位紀錄
 # ==========================================
 with tab2:
     st.subheader("📝 現場點位紀錄表")
@@ -151,7 +161,7 @@ with tab2:
         # 轉成 DataFrame 顯示
         df_records = pd.DataFrame(st.session_state['saved_points'])
         
-        # 顯示表格
+        # 顯示表格 (包含新的註記欄位)
         st.dataframe(df_records, use_container_width=True)
         
         col_dl, col_clear = st.columns([1, 1])
@@ -175,8 +185,7 @@ with tab2:
                 st.session_state['saved_points'] = []
                 st.rerun()
     else:
-        st.info("目前沒有紀錄。請至「📍 GPS 定位」分頁點擊「儲存目前點位」。")
-        st.caption("注意：重新整理網頁會清空未下載的紀錄，請記得定期匯出。")
+        st.info("目前沒有紀錄。請至「📍 GPS 定位」分頁進行紀錄。")
 
 # ==========================================
 # 分頁 3: 潛勢地圖
