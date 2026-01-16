@@ -10,6 +10,7 @@ import urllib3
 import os
 import json
 import streamlit.components.v1 as components
+from datetime import datetime, timedelta, timezone
 
 # --- 設定 ---
 urllib3.disable_warnings()
@@ -35,6 +36,10 @@ st.markdown("""
 
 st.title("📍 現場座標轉換通")
 
+# --- 初始化 Session State (用於暫存點位紀錄) ---
+if 'saved_points' not in st.session_state:
+    st.session_state['saved_points'] = []
+
 # --- 初始化轉換器 ---
 @st.cache_resource
 def get_transformers():
@@ -49,14 +54,19 @@ with st.sidebar:
     st.header("⚙️ 設定")
     google_api_key = st.text_input("Google API Key", type="password")
     st.caption("若需「地址反查」請輸入 Key。")
+    
+    # 側邊欄顯示目前紀錄筆數
+    if len(st.session_state['saved_points']) > 0:
+        st.divider()
+        st.metric("已紀錄點位", f"{len(st.session_state['saved_points'])} 筆")
 
 # ==========================================
-# 介面分頁 (改為 4 個分頁)
+# 介面分頁 (改為 5 個分頁)
 # ==========================================
-tab1, tab2, tab3, tab4 = st.tabs(["📍 GPS 定位", "🔗 潛勢地圖", "🔍 單筆轉換", "📂 批次轉換"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["📍 GPS 定位", "🔗 潛勢地圖", "🔍 單筆轉換", "📂 批次轉換", "📝 點位紀錄"])
 
 # ==========================================
-# 分頁 1: 純 GPS 定位 + 定位地圖
+# 分頁 1: 純 GPS 定位 + 儲存功能
 # ==========================================
 with tab1:
     # 教學區塊
@@ -85,6 +95,30 @@ with tab1:
         c1, c2 = st.columns(2)
         with c1: st.metric("TWD97 X", f"{my_x:.3f}")
         with c2: st.metric("TWD97 Y", f"{my_y:.3f}")
+
+        # --- 新增：儲存點位按鈕 ---
+        col_save, col_note = st.columns([1, 3])
+        with col_save:
+            if st.button("💾 儲存目前點位", type="primary", use_container_width=True):
+                # 取得台灣時間
+                tz = timezone(timedelta(hours=8))
+                now_str = datetime.now(tz).strftime("%Y-%m-%d %H:%M:%S")
+                
+                # 加入紀錄列表
+                new_record = {
+                    "時間": now_str,
+                    "經度 (Lon)": my_lng,
+                    "緯度 (Lat)": my_lat,
+                    "TWD97_X": my_x,
+                    "TWD97_Y": my_y,
+                    "誤差(m)": round(acc, 1)
+                }
+                st.session_state['saved_points'].append(new_record)
+                st.toast(f"✅ 已儲存點位！目前共 {len(st.session_state['saved_points'])} 筆", icon="💾")
+        
+        with col_note:
+            st.caption("💡 點擊儲存後，資料會暫存於「📝 點位紀錄」分頁，離開網頁前請記得匯出。")
+
     elif location and 'error' in location:
         st.error(f"定位失敗: {location['error']}")
     else:
@@ -92,7 +126,7 @@ with tab1:
 
     st.divider()
 
-    # --- 定位地圖 (顯示紅點) ---
+    # --- 定位地圖 ---
     st.markdown("### 🗺️ 定位地圖")
     map_center = [my_lat, my_lng] if my_lat else [22.75, 121.15]
     zoom_level = 16 if my_lat else 11
@@ -102,39 +136,17 @@ with tab1:
     if my_lat and my_lng:
         folium.Marker([my_lat, my_lng], popup="您的位置", icon=folium.Icon(color='red', icon='info-sign')).add_to(m)
     
-    # 萬能圖層讀取函式 (保留功能，但不一定顯示，避免版面亂)
-    def load_layer_safe(file_prefix, layer_name, style_func):
-        target_file = None
-        if os.path.exists(f"{file_prefix}.geojson"): target_file = f"{file_prefix}.geojson"
-        elif os.path.exists(f"{file_prefix}.geojson.json"): target_file = f"{file_prefix}.geojson.json"
-        
-        if target_file:
-            try:
-                with open(target_file, "r", encoding="utf-8-sig") as f: data = json.load(f)
-                if isinstance(data, list): data = data[0]
-                folium.GeoJson(data, name=layer_name, style_function=style_func).add_to(m)
-            except: pass
-
-    load_layer_safe("streams", "🌊 土石流潛勢溪流", lambda x: {'color': 'blue', 'weight': 3, 'opacity': 0.7})
-    load_layer_safe("areas", "⚠️ 土石流影響範圍", lambda x: {'fillColor': '#ffcc00', 'color': 'orange', 'weight': 1, 'fillOpacity': 0.4})
-
     folium.LayerControl().add_to(m)
     st_folium(m, width="100%", height=400)
 
 # ==========================================
-# 分頁 2: 潛勢地圖 (Google My Maps)
+# 分頁 2: 潛勢地圖
 # ==========================================
 with tab2:
     st.markdown("### 🔗 土石流潛勢地圖")
-    
-    # 您的地圖連結
     your_map_link = "https://www.google.com/maps/d/u/0/embed?mid=1eYJ5XO2j4dhyO1AGnrtbTAGhdL1Yyak&ehbc=2E312F"
-    
-    # 一鍵跳轉按鈕
     st.link_button("🚀 在 Google Maps App 開啟 (顯示定位點)", your_map_link, use_container_width=True)
     st.caption("點擊上方按鈕可開啟手機 App 導航。下方為預覽視窗：")
-
-    # 顯示嵌入地圖
     try:
         components.iframe(your_map_link, height=600)
     except Exception as e:
@@ -208,6 +220,43 @@ with tab4:
             st.dataframe(df.head())
             st.download_button("下載結果", df.to_csv(index=False).encode('utf-8-sig'), "result.csv", "text/csv", use_container_width=True)
         except Exception as e: st.error(str(e))
+
+# ==========================================
+# 分頁 5: 點位紀錄 (新增功能)
+# ==========================================
+with tab5:
+    st.subheader("📝 現場點位紀錄表")
+    
+    if len(st.session_state['saved_points']) > 0:
+        # 轉成 DataFrame 顯示
+        df_records = pd.DataFrame(st.session_state['saved_points'])
+        
+        # 顯示表格
+        st.dataframe(df_records, use_container_width=True)
+        
+        col_dl, col_clear = st.columns([1, 1])
+        
+        with col_dl:
+            # 匯出 CSV 按鈕
+            csv = df_records.to_csv(index=False).encode('utf-8-sig')
+            file_name = f"gps_records_{datetime.now().strftime('%Y%m%d_%H%M')}.csv"
+            st.download_button(
+                label="📥 匯出紀錄 (CSV)",
+                data=csv,
+                file_name=file_name,
+                mime="text/csv",
+                type="primary",
+                use_container_width=True
+            )
+            
+        with col_clear:
+            # 清除按鈕
+            if st.button("🗑️ 清空所有紀錄", type="secondary", use_container_width=True):
+                st.session_state['saved_points'] = []
+                st.rerun()
+    else:
+        st.info("目前沒有紀錄。請至「📍 GPS 定位」分頁點擊「儲存目前點位」。")
+        st.caption("注意：重新整理網頁會清空未下載的紀錄，請記得定期匯出。")
 
 # --- 底部宣告 ---
 st.markdown('<div class="footer">Made with ❤️ by 阿誠</div>', unsafe_allow_html=True)
